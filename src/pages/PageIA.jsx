@@ -1,49 +1,69 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { L } from "../constants/theme";
-import { Fade, Card, Row, Tag, IBtn } from "../components/ui";
+import { Fade, Card, Row } from "../components/ui";
+import { askClaude, getDemoResponse } from "../lib/claude";
+
+const HAS_KEY = !!import.meta.env.VITE_ANTHROPIC_API_KEY;
 
 const SUGESTOES = [
-  "Qual o prazo para contestação em ação ordinária?",
-  "Como calcular honorários sucumbenciais?",
-  "Quais são as hipóteses de prescrição no direito do trabalho?",
-  "Explique o princípio da sucumbência recíproca",
-  "Quais documentos são necessários para uma ação de divórcio?",
-  "Diferença entre dano moral e dano material",
-  "O que é tutela de urgência antecipada?",
-  "Prazos para recursos no processo civil",
+  { ico:"⏱", txt:"Qual o prazo para contestação em ação ordinária?" },
+  { ico:"💰", txt:"Como calcular honorários sucumbenciais?" },
+  { ico:"⚖️", txt:"Quais as hipóteses de prescrição no direito do trabalho?" },
+  { ico:"📋", txt:"Elabore uma minuta de contrato de honorários advocatícios" },
+  { ico:"🏛️", txt:"Explique o princípio da sucumbência recíproca" },
+  { ico:"📄", txt:"O que é tutela de urgência antecipada e seus requisitos?" },
+  { ico:"🔍", txt:"Quais os recursos cabíveis após uma sentença civil?" },
+  { ico:"👨‍⚖️", txt:"Diferença entre dano moral, material e estético" },
+  { ico:"📜", txt:"Quais os requisitos da petição inicial no CPC/2015?" },
+  { ico:"🏢", txt:"Como funciona a desconsideração da personalidade jurídica?" },
 ];
 
-const RESPOSTAS_MOCK = {
-  "prazo para contestação": `**Prazo para Contestação — Ação Ordinária (Rito Comum)**\n\nCom base no **art. 335 do CPC/2015**, o prazo para apresentação da contestação é:\n\n• **15 dias úteis** — regra geral para partes privadas\n• **30 dias úteis** — pessoas jurídicas de direito público (art. 183 CPC)\n• **Litisconsórcio passivo** com diferentes procuradores de escritórios distintos: prazo em dobro (30 dias úteis)\n\n**Contagem do prazo:**\nO prazo inicia-se da data de juntada do mandado de citação cumprido aos autos ou da data da citação por edital/carta.\n\n⚠️ **Atenção:** Verifique se há disposição especial para a ação específica, como prazo diferenciado em ações de família ou procedimentos especiais.\n\n*Referência: CPC/2015, arts. 335, 180, 183, 229*`,
-  "honorários sucumbenciais": `**Honorários Sucumbenciais — Art. 85 do CPC/2015**\n\nO juiz fixará os honorários de sucumbência observando:\n\n**Percentual (§2º):**\n• Mínimo de **10%** e máximo de **20%** sobre:\n  - Valor da condenação\n  - Proveito econômico obtido\n  - Valor atualizado da causa\n\n**Critérios de fixação (§2º, I-IV):**\n1. Grau de zelo do profissional\n2. Lugar da prestação do serviço\n3. Natureza e importância da causa\n4. Trabalho realizado pelo advogado e tempo exigido\n\n**Causas sem condenação em dinheiro (§8º):**\nO valor será apreciado equitativamente pelo juiz.\n\n**Fazenda Pública (§3º):**\nEscalona progressivamente de 10% até 1% conforme o valor da condenação.\n\n⚖️ Os honorários são direito autônomo do advogado e não podem ser compensados.\n\n*Referência: CPC/2015, art. 85; Súmula 306 STJ*`,
-  default: `Estou processando sua consulta jurídica...\n\n**Aviso importante:** Esta é uma demonstração do sistema C4 IA Jurídica. Para funcionalidade completa com IA real (Claude AI da Anthropic), será necessário configurar a integração após o setup do Supabase.\n\nNo modo de produção, responderei consultas sobre:\n• Prazos processuais (CPC, CLT, CTN)\n• Legislação federal, estadual e municipal\n• Jurisprudência dos tribunais superiores\n• Estratégia processual\n• Geração de minutas e peças processuais\n• Análise de documentos jurídicos\n\n*C4 IA Jurídica — Powered by Claude AI (Anthropic)*`,
-};
-
-function getRespostaMock(msg) {
-  const m = msg.toLowerCase();
-  if (m.includes("contest") || m.includes("prazo")) return RESPOSTAS_MOCK["prazo para contestação"];
-  if (m.includes("sucumb") || m.includes("honorár")) return RESPOSTAS_MOCK["honorários sucumbenciais"];
-  return RESPOSTAS_MOCK["default"];
-}
-
 function MarkdownText({ text }) {
-  const lines = text.split("\n");
+  if (!text) return null;
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g);
+  const renderInline = (t) => {
+    if (t.startsWith("**") && t.endsWith("**")) return <strong style={{fontWeight:700,color:L.t1}}>{t.slice(2,-2)}</strong>;
+    if (t.startsWith("*") && t.endsWith("*"))   return <em>{t.slice(1,-1)}</em>;
+    if (t.startsWith("`") && t.endsWith("`"))   return <code style={{background:L.surface,padding:"1px 5px",borderRadius:4,fontFamily:"'JetBrains Mono',monospace",fontSize:11}}>{t.slice(1,-1)}</code>;
+    return t;
+  };
+
   return (
-    <div style={{fontSize:12.5,lineHeight:1.8,color:L.t1}}>
-      {lines.map((line,i) => {
-        if (!line.trim()) return <div key={i} style={{height:8}}/>;
-        let content = line
-          .replace(/\*\*(.+?)\*\*/g, (_, m) => `<strong style="color:${L.t1};font-weight:700">${m}</strong>`)
-          .replace(/^• /, '');
-        const isBullet = line.startsWith("•");
-        const isTitle  = line.startsWith("#");
+    <div style={{fontSize:12.5,lineHeight:1.85,color:L.t2}}>
+      {text.split("\n").map((line, i) => {
+        if (!line.trim()) return <div key={i} style={{height:6}}/>;
+
+        const isBullet  = /^[•\-*]\s/.test(line);
+        const isNum     = /^\d+\.\s/.test(line);
+        const isH2      = line.startsWith("## ");
+        const isH3      = line.startsWith("### ");
+        const isWarn    = line.startsWith("⚠️") || line.startsWith("*Ref");
+        const cleanLine = line.replace(/^[•\-*]\s|^\d+\.\s|^##+ /, "");
+
+        if (isH2) return (
+          <div key={i} style={{fontSize:13.5,fontWeight:700,color:L.t1,marginTop:14,marginBottom:6,paddingBottom:4,borderBottom:`1px solid ${L.line}`,fontFamily:"'Outfit',sans-serif"}}>
+            {parts.map(renderInline)}
+          </div>
+        );
+        if (isH3) return (
+          <div key={i} style={{fontSize:12.5,fontWeight:700,color:L.t1,marginTop:10,marginBottom:4}}>
+            {cleanLine.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map(renderInline)}
+          </div>
+        );
+        if (isWarn) return (
+          <div key={i} style={{fontSize:11,color:L.t3,fontStyle:"italic",marginTop:8,padding:"6px 10px",background:L.surface,borderRadius:6,borderLeft:`2px solid var(--c-gold)`}}>
+            {cleanLine.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map(renderInline)}
+          </div>
+        );
+        if (isBullet || isNum) return (
+          <div key={i} style={{display:"flex",gap:8,marginBottom:2,paddingLeft:4}}>
+            <span style={{color:"#c9a430",flexShrink:0,fontWeight:700,marginTop:1,fontSize:11}}>{isNum ? line.match(/^\d+/)[0]+"." : "•"}</span>
+            <span>{cleanLine.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map(renderInline)}</span>
+          </div>
+        );
         return (
-          <div key={i} style={{marginBottom:2,paddingLeft:isBullet?12:0,display:"flex",gap:isBullet?6:0}}>
-            {isBullet && <span style={{color:L.accent,flexShrink:0,marginTop:1}}>•</span>}
-            <span
-              style={{fontWeight:isTitle?700:400,fontSize:isTitle?13:12.5,color:isTitle?L.t1:L.t2}}
-              dangerouslySetInnerHTML={{__html:content}}
-            />
+          <div key={i} style={{marginBottom:2}}>
+            {line.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).map(renderInline)}
           </div>
         );
       })}
@@ -51,29 +71,141 @@ function MarkdownText({ text }) {
   );
 }
 
+function MsgBubble({ msg }) {
+  const isUser = msg.role === "user";
+  const fmtTs  = d => d.toLocaleTimeString("pt-BR", {hour:"2-digit",minute:"2-digit"});
+  return (
+    <div style={{display:"flex",gap:10,flexDirection:isUser?"row-reverse":"row",alignItems:"flex-start",animation:"up .25s ease"}}>
+      {/* Avatar */}
+      <div style={{
+        width:34,height:34,borderRadius:9,flexShrink:0,
+        background: isUser ? "#0b1630" : "rgba(201,164,48,0.15)",
+        border:`1px solid ${isUser ? "#162340" : "rgba(201,164,48,0.3)"}`,
+        display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,
+      }}>
+        {isUser ? "👤" : "⚖️"}
+      </div>
+      {/* Conteúdo */}
+      <div style={{maxWidth:"78%"}}>
+        <div style={{
+          padding:"12px 16px",
+          borderRadius: isUser ? "12px 4px 12px 12px" : "4px 12px 12px 12px",
+          background: isUser ? "#0b1630" : L.white,
+          border:`1px solid ${isUser ? "#162340" : L.line}`,
+          boxShadow:"0 2px 8px rgba(0,0,0,0.07)",
+        }}>
+          {isUser
+            ? <div style={{fontSize:12.5,color:"rgba(255,255,255,0.92)",lineHeight:1.65}}>{msg.text}</div>
+            : <MarkdownText text={msg.text}/>
+          }
+          {msg.error && (
+            <div style={{fontSize:11,color:L.red,marginTop:8,padding:"6px 10px",background:L.redBg,borderRadius:6}}>
+              ⚠️ {msg.error}
+            </div>
+          )}
+        </div>
+        <div style={{fontSize:9,color:L.t4,marginTop:3,textAlign:isUser?"right":"left",fontFamily:"'JetBrains Mono',monospace"}}>
+          {fmtTs(msg.ts)}
+          {!HAS_KEY && !isUser && <span style={{marginLeft:6,opacity:.7}}>· DEMO</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+      <div style={{width:34,height:34,borderRadius:9,background:"rgba(201,164,48,0.12)",border:"1px solid rgba(201,164,48,0.28)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>⚖️</div>
+      <div style={{padding:"13px 16px",borderRadius:"4px 12px 12px 12px",background:L.white,border:`1px solid ${L.line}`,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>
+        <div style={{display:"flex",gap:5,alignItems:"center"}}>
+          {[0,1,2].map(j => (
+            <div key={j} style={{width:7,height:7,borderRadius:"50%",background:"#c9a430",animation:`blink 1.3s ease ${j*.28}s infinite`}}/>
+          ))}
+          <span style={{fontSize:10,color:L.t4,marginLeft:4,fontFamily:"'JetBrains Mono',monospace"}}>analisando...</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const BOAS_VINDAS = (nome) =>
+`Olá, **${nome}**! Sou o **C4 IA Jurídica**, seu assistente especializado em Direito brasileiro.
+
+**Posso ajudar com:**
+• Prazos processuais e contagem (CPC, CLT, CTN, CPP)
+• Legislação federal, estadual e jurisprudência atualizada
+• Estratégia processual e análise de risco
+• STF, STJ, TST — súmulas, teses e julgados
+• Geração de minutas de peças processuais (com revisão obrigatória)
+• Interpretação de contratos e documentos
+
+Como posso auxiliar hoje?`;
+
 export default function PageIA({ user }) {
-  const [msgs, setMsgs]   = useState([
-    { role:"assistant", text:`Olá, **${user.nome}**! Sou o **C4 IA Jurídica**, seu assistente de inteligência artificial especializado em Direito brasileiro.\n\nPosso ajudar com:\n• Prazos processuais e procedimentos\n• Legislação e jurisprudência\n• Estratégia e análise processual\n• Geração de minutas de peças\n• Interpretação de documentos jurídicos\n\n⚠️ *Modo demo — respostas simuladas. Configure a integração com Claude AI para respostas reais.*\n\nComo posso ajudar hoje?`, ts:new Date() },
-  ]);
-  const [input, setInput] = useState("");
+  const [msgs, setMsgs]     = useState([{role:"assistant", text:BOAS_VINDAS(user.nome.split(" ")[0]), ts:new Date()}]);
+  const [input, setInput]   = useState("");
   const [loading, setLoading] = useState(false);
-  const endRef = useRef(null);
+  const [abortCtrl, setAbortCtrl] = useState(null);
+  const endRef   = useRef(null);
+  const inputRef = useRef(null);
 
-  useEffect(() => { endRef.current?.scrollIntoView({behavior:"smooth"}); }, [msgs]);
+  useEffect(() => { endRef.current?.scrollIntoView({behavior:"smooth"}); }, [msgs, loading]);
 
-  function enviar(texto) {
-    const msg = texto || input.trim();
-    if (!msg) return;
+  const enviar = useCallback(async (texto) => {
+    const msg = (texto || input).trim();
+    if (!msg || loading) return;
     setInput("");
-    setMsgs(ms => [...ms, {role:"user", text:msg, ts:new Date()}]);
+
+    const userMsg = {role:"user", text:msg, ts:new Date()};
+    setMsgs(ms => [...ms, userMsg]);
     setLoading(true);
-    setTimeout(() => {
-      setMsgs(ms => [...ms, {role:"assistant", text:getRespostaMock(msg), ts:new Date()}]);
+
+    const ctrl = new AbortController();
+    setAbortCtrl(ctrl);
+
+    try {
+      // Monta histórico para contexto (últimas 10 trocas)
+      const history = [...msgs, userMsg]
+        .filter(m => !m.error)
+        .slice(-20)
+        .map(m => ({role: m.role, content: m.text}));
+
+      let resposta;
+      if (HAS_KEY) {
+        resposta = await askClaude(history, ctrl.signal);
+      } else {
+        await new Promise(r => setTimeout(r, 900 + Math.random()*600));
+        resposta = getDemoResponse(msg);
+      }
+      setMsgs(ms => [...ms, {role:"assistant", text:resposta, ts:new Date()}]);
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      const isNoKey = err.message === "API_KEY_MISSING";
+      setMsgs(ms => [...ms, {
+        role:"assistant",
+        text: isNoKey
+          ? "⚠️ API Key não configurada. Adicione `VITE_ANTHROPIC_API_KEY` no arquivo `.env` para usar a IA real."
+          : "Ocorreu um erro ao processar sua consulta.",
+        error: isNoKey ? null : err.message,
+        ts: new Date(),
+      }]);
+    } finally {
       setLoading(false);
-    }, 1200 + Math.random()*800);
+      setAbortCtrl(null);
+      inputRef.current?.focus();
+    }
+  }, [input, loading, msgs]);
+
+  function cancelar() {
+    abortCtrl?.abort();
+    setLoading(false);
   }
 
-  const fmtTs = d => d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  function limpar() {
+    setMsgs([{role:"assistant", text:BOAS_VINDAS(user.nome.split(" ")[0]), ts:new Date()}]);
+    setInput("");
+  }
 
   return (
     <Fade>
@@ -81,100 +213,149 @@ export default function PageIA({ user }) {
         <div>
           <div style={{fontSize:18,fontWeight:700,color:L.t1,fontFamily:"'Outfit',sans-serif",display:"flex",alignItems:"center",gap:10}}>
             C4 IA Jurídica
-            <span style={{background:L.tealBg,color:L.accent,borderRadius:6,padding:"2px 10px",fontSize:10,fontWeight:700,letterSpacing:"1px",fontFamily:"'JetBrains Mono',monospace",border:`1px solid ${L.tealA2}`}}>IA</span>
+            <span style={{background:"rgba(201,164,48,0.14)",color:"#c9a430",borderRadius:6,padding:"2px 10px",fontSize:9,fontWeight:700,letterSpacing:"1.5px",fontFamily:"'JetBrains Mono',monospace",border:"1px solid rgba(201,164,48,0.32)"}}>
+              {HAS_KEY ? "ATIVA" : "DEMO"}
+            </span>
           </div>
-          <div style={{fontSize:11,color:L.t3,marginTop:2}}>Assistente jurídico especializado em Direito brasileiro • Powered by Claude AI</div>
+          <div style={{fontSize:11,color:L.t3,marginTop:2}}>
+            Assistente jurídico especializado em Direito brasileiro · {HAS_KEY ? "Powered by Claude AI (Anthropic)" : "Configure VITE_ANTHROPIC_API_KEY para ativar"}
+          </div>
         </div>
-        <button onClick={()=>setMsgs([msgs[0]])}
-          style={{background:L.surface,border:`1px solid ${L.line}`,borderRadius:8,padding:"7px 14px",cursor:"pointer",fontSize:11,color:L.t3,fontFamily:"inherit",transition:"all .12s"}}
+        <button onClick={limpar}
+          style={{background:L.surface,border:`1px solid ${L.line}`,borderRadius:8,padding:"7px 14px",cursor:"pointer",fontSize:11,color:L.t3,fontFamily:"inherit",transition:"all .12s",display:"flex",alignItems:"center",gap:5}}
           onMouseEnter={e=>{e.currentTarget.style.borderColor=L.red;e.currentTarget.style.color=L.red;}}
           onMouseLeave={e=>{e.currentTarget.style.borderColor=L.line;e.currentTarget.style.color=L.t3;}}
         >
-          Limpar conversa
+          🗑 Nova conversa
         </button>
       </Row>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 280px",gap:16,height:"calc(100vh - 200px)",minHeight:400}} className="rg-auto">
-        {/* Chat */}
-        <div style={{display:"flex",flexDirection:"column",background:L.white,borderRadius:14,border:`1px solid ${L.line}`,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-          {/* Messages */}
-          <div style={{flex:1,overflowY:"auto",padding:"20px",display:"flex",flexDirection:"column",gap:16}}>
-            {msgs.map((m,i) => (
-              <div key={i} style={{display:"flex",gap:10,flexDirection:m.role==="user"?"row-reverse":"row",alignItems:"flex-start"}}>
-                {/* Avatar */}
-                <div style={{width:32,height:32,borderRadius:9,background:m.role==="user"?L.accent:L.tealBg,border:`1px solid ${m.role==="user"?L.accent:L.tealA}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>
-                  {m.role==="user"?"👤":"⚖️"}
-                </div>
-                {/* Bubble */}
-                <div style={{maxWidth:"78%"}}>
-                  <div style={{padding:"12px 16px",borderRadius:m.role==="user"?"12px 4px 12px 12px":"4px 12px 12px 12px",background:m.role==="user"?L.accent:L.surface,border:`1px solid ${m.role==="user"?L.accent:L.line}`,boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}>
-                    {m.role==="user"
-                      ? <div style={{fontSize:12.5,color:"white",lineHeight:1.6}}>{m.text}</div>
-                      : <MarkdownText text={m.text}/>
-                    }
-                  </div>
-                  <div style={{fontSize:9,color:L.t4,marginTop:4,textAlign:m.role==="user"?"right":"left",fontFamily:"'JetBrains Mono',monospace"}}>{fmtTs(m.ts)}</div>
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
-                <div style={{width:32,height:32,borderRadius:9,background:L.tealBg,border:`1px solid ${L.tealA}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>⚖️</div>
-                <div style={{padding:"12px 16px",borderRadius:"4px 12px 12px 12px",background:L.surface,border:`1px solid ${L.line}`}}>
-                  <div style={{display:"flex",gap:4,alignItems:"center",height:20}}>
-                    {[0,1,2].map(j=>(
-                      <div key={j} style={{width:6,height:6,borderRadius:"50%",background:L.accent,animation:`blink 1.2s ease ${j*.3}s infinite`}}/>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 270px",gap:16,height:"calc(100vh - 190px)",minHeight:420}} className="rg-auto">
+
+        {/* ── Painel do chat ── */}
+        <div style={{display:"flex",flexDirection:"column",background:L.white,borderRadius:14,border:`1px solid ${L.line}`,overflow:"hidden",boxShadow:"0 2px 16px rgba(0,0,0,0.07)"}}>
+
+          {/* Header do chat */}
+          <div style={{padding:"12px 18px",borderBottom:`1px solid ${L.line}`,background:L.surface,display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+            <div style={{width:9,height:9,borderRadius:"50%",background:HAS_KEY?"#1a7438":"#c9a430",boxShadow:`0 0 6px ${HAS_KEY?"#1a7438":"#c9a430"}`}}/>
+            <div style={{flex:1}}>
+              <div style={{fontSize:12,fontWeight:600,color:L.t1}}>C4 IA Jurídica</div>
+              <div style={{fontSize:9,color:L.t4,fontFamily:"'JetBrains Mono',monospace"}}>{HAS_KEY ? "Claude AI (Anthropic) · Ativo" : "Modo demonstração · Configure a API Key"}</div>
+            </div>
+            <div style={{fontSize:10,color:L.t4}}>{msgs.length - 1} mensagens</div>
+          </div>
+
+          {/* Mensagens */}
+          <div style={{flex:1,overflowY:"auto",padding:"20px 18px",display:"flex",flexDirection:"column",gap:16}}>
+            {msgs.map((m,i) => <MsgBubble key={i} msg={m}/>)}
+            {loading && <TypingIndicator/>}
             <div ref={endRef}/>
           </div>
 
           {/* Input */}
-          <div style={{borderTop:`1px solid ${L.line}`,padding:"14px 16px",background:L.surface}}>
+          <div style={{borderTop:`1px solid ${L.line}`,padding:"12px 16px",background:L.surface,flexShrink:0}}>
             <div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
-              <textarea
-                value={input}
-                onChange={e=>setInput(e.target.value)}
-                onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();enviar();}}}
-                placeholder="Digite sua consulta jurídica... (Enter para enviar, Shift+Enter para nova linha)"
-                rows={2}
-                style={{flex:1,background:L.white,border:`1.5px solid ${L.line}`,borderRadius:10,padding:"10px 14px",color:L.t1,fontSize:12.5,fontFamily:"'Instrument Sans',sans-serif",outline:"none",resize:"none",lineHeight:1.6,transition:"border-color .12s"}}
-                onFocus={e=>{e.target.style.borderColor=L.accent;}}
-                onBlur={e=>{e.target.style.borderColor=L.line;}}
-              />
-              <button onClick={()=>enviar()} disabled={!input.trim()||loading}
-                style={{padding:"10px 18px",borderRadius:10,background:input.trim()&&!loading?L.accent:L.surface,color:input.trim()&&!loading?"white":L.t4,border:`1px solid ${input.trim()&&!loading?L.accent:L.line}`,cursor:input.trim()&&!loading?"pointer":"not-allowed",fontSize:13,fontWeight:700,transition:"all .15s",flexShrink:0,height:44}}>
-                ➤
-              </button>
+              <div style={{flex:1,position:"relative"}}>
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); enviar(); }}}
+                  placeholder="Digite sua consulta jurídica... (Enter para enviar, Shift+Enter para nova linha)"
+                  rows={2}
+                  disabled={loading}
+                  style={{
+                    width:"100%",background:L.white,
+                    border:`1.5px solid ${input.trim() ? "#c9a430" : L.line}`,
+                    borderRadius:10,padding:"10px 14px",color:L.t1,
+                    fontSize:12.5,fontFamily:"'Instrument Sans',sans-serif",
+                    outline:"none",resize:"none",lineHeight:1.65,
+                    transition:"border-color .15s",
+                    opacity: loading ? .6 : 1,
+                  }}
+                  onFocus={e => e.target.style.borderColor="#c9a430"}
+                  onBlur={e => e.target.style.borderColor=input.trim()?"#c9a430":L.line}
+                />
+              </div>
+              {loading ? (
+                <button onClick={cancelar}
+                  style={{padding:"10px 14px",borderRadius:10,background:L.redBg,color:L.red,border:`1px solid ${L.redA}`,cursor:"pointer",fontSize:13,flexShrink:0,height:44,transition:"all .12s"}}
+                  title="Cancelar">
+                  ✕
+                </button>
+              ) : (
+                <button onClick={() => enviar()} disabled={!input.trim()}
+                  style={{
+                    padding:"10px 16px",borderRadius:10,height:44,flexShrink:0,
+                    background: input.trim() ? "#0b1630" : L.surface,
+                    color: input.trim() ? "white" : L.t4,
+                    border:`1px solid ${input.trim() ? "#162340" : L.line}`,
+                    cursor: input.trim() ? "pointer" : "not-allowed",
+                    fontSize:14,fontWeight:700,transition:"all .15s",
+                    boxShadow: input.trim() ? "0 2px 8px rgba(11,22,48,.25)" : "none",
+                  }}>
+                  ➤
+                </button>
+              )}
             </div>
-            <div style={{fontSize:9,color:L.t4,marginTop:6,fontFamily:"'JetBrains Mono',monospace"}}>
-              ⚠️ DEMO — Respostas simuladas. Configure Claude API para IA real. Sempre revise com profissional habilitado.
+            <div style={{fontSize:9,color:L.t4,marginTop:6,fontFamily:"'JetBrains Mono',monospace",display:"flex",alignItems:"center",gap:6}}>
+              <span style={{color:"#c9a430",opacity:.7}}>⚠</span>
+              Respostas de IA não substituem orientação jurídica profissional. Sempre revise antes de usar em processos reais.
             </div>
           </div>
         </div>
 
-        {/* Sugestões */}
-        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+        {/* ── Painel lateral ── */}
+        <div style={{display:"flex",flexDirection:"column",gap:12,overflowY:"auto"}}>
+
+          {/* Consultas rápidas */}
           <Card title="Consultas Rápidas" sub="clique para enviar">
-            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{display:"flex",flexDirection:"column",gap:5}}>
               {SUGESTOES.map((s,i) => (
-                <button key={i} onClick={()=>enviar(s)}
-                  style={{width:"100%",textAlign:"left",background:L.surface,border:`1px solid ${L.line}`,borderRadius:8,padding:"8px 12px",cursor:"pointer",fontSize:11.5,color:L.t2,fontFamily:"inherit",transition:"all .12s",lineHeight:1.4}}
-                  onMouseEnter={e=>{e.currentTarget.style.background=L.tealBg;e.currentTarget.style.borderColor=L.tealA2;e.currentTarget.style.color=L.accent;}}
+                <button key={i} onClick={() => enviar(s.txt)} disabled={loading}
+                  style={{
+                    width:"100%",textAlign:"left",
+                    background:L.surface,border:`1px solid ${L.line}`,
+                    borderRadius:8,padding:"7px 10px",
+                    cursor:loading?"not-allowed":"pointer",
+                    fontSize:11.5,color:L.t2,fontFamily:"inherit",
+                    transition:"all .12s",lineHeight:1.4,
+                    display:"flex",alignItems:"flex-start",gap:7,
+                    opacity:loading?.6:1,
+                  }}
+                  onMouseEnter={e=>{if(!loading){e.currentTarget.style.background="rgba(201,164,48,0.08)";e.currentTarget.style.borderColor="rgba(201,164,48,0.35)";e.currentTarget.style.color=L.t1;}}}
                   onMouseLeave={e=>{e.currentTarget.style.background=L.surface;e.currentTarget.style.borderColor=L.line;e.currentTarget.style.color=L.t2;}}
                 >
-                  ⚖️ {s}
+                  <span style={{flexShrink:0,fontSize:13}}>{s.ico}</span>
+                  <span>{s.txt}</span>
                 </button>
               ))}
             </div>
           </Card>
 
-          <div style={{padding:"14px 16px",borderRadius:12,background:`linear-gradient(135deg,#0d2b55,#1a4a8a)`,color:"white"}}>
-            <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>✨ IA Real (Em breve)</div>
-            <div style={{fontSize:11,opacity:.85,lineHeight:1.6}}>Configure a integração com o Claude AI da Anthropic para respostas jurídicas reais, análise de documentos e geração de peças processuais.</div>
+          {/* Status da IA */}
+          <div style={{
+            padding:"14px 16px",borderRadius:12,
+            background: HAS_KEY
+              ? "linear-gradient(135deg,#071428,#0c1e40)"
+              : "linear-gradient(135deg,#1a1408,#251d0a)",
+            border:`1px solid ${HAS_KEY ? "#1a2d50" : "rgba(201,164,48,0.25)"}`,
+          }}>
+            <div style={{fontSize:12,fontWeight:700,color:HAS_KEY?"#5590ff":"#c9a430",marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
+              {HAS_KEY ? "✅ IA Conectada" : "⚙️ Configurar IA"}
+            </div>
+            <div style={{fontSize:11,color:"rgba(255,255,255,0.65)",lineHeight:1.65}}>
+              {HAS_KEY
+                ? "Claude AI (Anthropic) ativo. Consultas jurídicas reais com legislação e jurisprudência atualizada."
+                : <>Adicione no arquivo <code style={{background:"rgba(201,164,48,0.15)",padding:"1px 5px",borderRadius:4,fontSize:10,fontFamily:"'JetBrains Mono',monospace"}}>.env</code>:<br/><br/><code style={{background:"rgba(201,164,48,0.1)",padding:"4px 8px",borderRadius:5,fontSize:9.5,fontFamily:"'JetBrains Mono',monospace",display:"block",marginTop:2,lineHeight:1.8,color:"#c9a430"}}>VITE_ANTHROPIC_API_KEY=<br/>sk-ant-...</code></>
+              }
+            </div>
+          </div>
+
+          {/* Aviso ético */}
+          <div style={{padding:"12px 14px",borderRadius:10,background:L.surface,border:`1px solid ${L.line}`,fontSize:10.5,color:L.t3,lineHeight:1.65}}>
+            <div style={{fontWeight:700,color:L.t2,marginBottom:4,fontSize:11}}>📋 Aviso Legal</div>
+            Respostas geradas por IA têm caráter informativo e de apoio à pesquisa jurídica. Não substituem a análise do profissional habilitado nem constituem orientação jurídica formal. Peças processuais geradas devem ser obrigatoriamente revisadas pelo advogado responsável.
           </div>
         </div>
       </div>

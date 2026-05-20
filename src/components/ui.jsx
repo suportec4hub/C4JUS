@@ -6,24 +6,26 @@ const ao = (color, pct) =>
     ? `color-mix(in srgb, ${color} ${pct}%, transparent)`
     : `${color}${Math.round(pct * 2.55).toString(16).padStart(2, "0")}`;
 
-export const TT = {background:L.white,border:`1px solid ${L.line}`,borderRadius:9,color:L.t1,fontSize:11,boxShadow:"0 4px 16px rgba(0,0,0,0.1)"};
+export const TT = {background:L.white,border:`1px solid ${L.line}`,borderRadius:9,color:L.t1,fontSize:11,boxShadow:"0 4px 20px rgba(0,0,0,0.12)"};
 export const TD = {padding:"11px 14px",fontSize:12.5,transition:"background .1s"};
 
 export function Fade({children}) {
   return <div style={{animation:"up .35s ease"}}>{children}</div>;
 }
 
-export function Card({title,sub,children,accent,action}) {
+export function Card({title,sub,children,accent,action,style:extraStyle}) {
   return (
-    <div style={{background:L.white,borderRadius:12,border:`1px solid ${L.line}`,padding:"18px 20px",boxShadow:"0 1px 4px rgba(0,0,0,0.05)",position:"relative",overflow:"hidden"}}>
-      <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:accent?`linear-gradient(90deg,var(--c-accent) 0%,transparent 70%)`:`linear-gradient(90deg,var(--c-line) 0%,transparent 60%)`}}/>
-      <div style={{marginBottom:14,display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
-        <div>
-          <div style={{fontSize:13,fontWeight:600,color:L.t1}}>{title}</div>
-          {sub && <div style={{fontSize:10.5,color:L.t3,marginTop:1}}>{sub}</div>}
+    <div style={{background:L.white,borderRadius:12,border:`1px solid ${L.line}`,padding:"18px 20px",boxShadow:"0 1px 6px rgba(0,0,0,0.06)",position:"relative",overflow:"hidden",...extraStyle}}>
+      <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:accent?`linear-gradient(90deg,#c9a430 0%,transparent 70%)`:`linear-gradient(90deg,${L.line} 0%,transparent 60%)`}}/>
+      {(title||action) && (
+        <div style={{marginBottom:14,display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
+          <div>
+            <div style={{fontSize:13,fontWeight:600,color:L.t1}}>{title}</div>
+            {sub && <div style={{fontSize:10.5,color:L.t3,marginTop:1}}>{sub}</div>}
+          </div>
+          {action}
         </div>
-        {action}
-      </div>
+      )}
       {children}
     </div>
   );
@@ -120,11 +122,11 @@ export function Chip({children,color,dot}) {
 }
 
 export function PBtn({children,onClick,full,disabled,color,small}) {
-  const bg = color || L.accent;
+  const bg = color || "#0b1630";
   return (
     <button onClick={onClick} disabled={disabled}
-      style={{padding:small?"6px 14px":"8px 18px",borderRadius:9,fontSize:small?11:12.5,fontWeight:600,cursor:disabled?"not-allowed":"pointer",fontFamily:"'Instrument Sans',sans-serif",background:disabled?L.surface:bg,color:disabled?L.t4:"white",border:"none",transition:"all .15s",whiteSpace:"nowrap",display:full?"block":"inline-flex",alignItems:"center",gap:6,width:full?"100%":"auto",boxShadow:disabled?"none":`0 4px 14px ${ao(bg,22)}`,letterSpacing:".1px",opacity:disabled?.6:1}}
-      onMouseEnter={e=>{if(!disabled){e.currentTarget.style.opacity=".9";e.currentTarget.style.transform="translateY(-1px)";}}}
+      style={{padding:small?"6px 14px":"8px 20px",borderRadius:8,fontSize:small?11:12.5,fontWeight:600,cursor:disabled?"not-allowed":"pointer",fontFamily:"'Instrument Sans',sans-serif",background:disabled?L.surface:bg,color:disabled?L.t4:"white",border:`1px solid ${disabled?L.line:"transparent"}`,transition:"all .15s",whiteSpace:"nowrap",display:full?"block":"inline-flex",alignItems:"center",gap:6,width:full?"100%":"auto",letterSpacing:".1px",opacity:disabled?.6:1,boxShadow:disabled?"none":"0 2px 8px rgba(11,22,48,0.25)"}}
+      onMouseEnter={e=>{if(!disabled){e.currentTarget.style.opacity=".88";e.currentTarget.style.transform="translateY(-1px)";}}}
       onMouseLeave={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.transform="none";}}
     >
       {children}

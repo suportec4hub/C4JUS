@@ -60,12 +60,12 @@ export default function PageDashboard({ user }) {
   return (
     <Fade>
       {/* Boas-vindas */}
-      <div style={{background:`linear-gradient(135deg,${L.tealBg},${L.copperBg})`,border:`1px solid ${L.tealA}`,borderRadius:12,padding:"14px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
+      <div style={{background:"linear-gradient(135deg,#0b1630 0%,#162448 100%)",border:"1px solid #1e2f50",borderRadius:12,padding:"16px 20px",marginBottom:20,display:"flex",alignItems:"center",gap:14}}>
         <div style={{fontSize:24}}>⚖️</div>
         <div>
-          <div style={{fontSize:14,fontWeight:700,color:L.t1}}>Bom dia, {user.nome.split(" ")[0]}!</div>
-          <div style={{fontSize:11,color:L.t3,marginTop:2}}>
-            Você tem <b style={{color:L.red}}>{dados.prazosUrgentes} prazos urgentes</b> e <b style={{color:L.blue}}>{dados.audienciasMes} audiências</b> nos próximos 30 dias.
+          <div style={{fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.95)"}}>Bom dia, {user.nome.split(" ")[0]}!</div>
+          <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:3}}>
+            Você tem <b style={{color:"#f87171"}}>{dados.prazosUrgentes} prazos urgentes</b> e <b style={{color:"#c9a430"}}>{dados.audienciasMes} audiências</b> nos próximos 30 dias.
           </div>
         </div>
       </div>
