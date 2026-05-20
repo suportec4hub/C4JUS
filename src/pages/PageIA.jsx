@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { L } from "../constants/theme";
 import { Fade, Card, Row } from "../components/ui";
-import { askClaude, getDemoResponse } from "../lib/claude";
+import { askAI, getDemoResponse } from "../lib/claude";
 
-const HAS_KEY = !!import.meta.env.VITE_ANTHROPIC_API_KEY;
+const HAS_KEY = !!import.meta.env.VITE_GROQ_API_KEY;
 
 const SUGESTOES = [
   { ico:"⏱", txt:"Qual o prazo para contestação em ação ordinária?" },
@@ -107,6 +107,7 @@ function MsgBubble({ msg }) {
         <div style={{fontSize:9,color:L.t4,marginTop:3,textAlign:isUser?"right":"left",fontFamily:"'JetBrains Mono',monospace"}}>
           {fmtTs(msg.ts)}
           {!HAS_KEY && !isUser && <span style={{marginLeft:6,opacity:.7}}>· DEMO</span>}
+          {HAS_KEY && !isUser && <span style={{marginLeft:6,opacity:.5}}>· Groq</span>}
         </div>
       </div>
     </div>
@@ -173,7 +174,7 @@ export default function PageIA({ user }) {
 
       let resposta;
       if (HAS_KEY) {
-        resposta = await askClaude(history, ctrl.signal);
+        resposta = await askAI(history, ctrl.signal);
       } else {
         await new Promise(r => setTimeout(r, 900 + Math.random()*600));
         resposta = getDemoResponse(msg);
@@ -218,7 +219,7 @@ export default function PageIA({ user }) {
             </span>
           </div>
           <div style={{fontSize:11,color:L.t3,marginTop:2}}>
-            Assistente jurídico especializado em Direito brasileiro · {HAS_KEY ? "Powered by Claude AI (Anthropic)" : "Configure VITE_ANTHROPIC_API_KEY para ativar"}
+            Assistente jurídico especializado em Direito brasileiro · {HAS_KEY ? "Powered by Groq AI · LLaMA 3.3 70B" : "Configure VITE_GROQ_API_KEY para ativar"}
           </div>
         </div>
         <button onClick={limpar}
@@ -240,7 +241,7 @@ export default function PageIA({ user }) {
             <div style={{width:9,height:9,borderRadius:"50%",background:HAS_KEY?"#1a7438":"#c9a430",boxShadow:`0 0 6px ${HAS_KEY?"#1a7438":"#c9a430"}`}}/>
             <div style={{flex:1}}>
               <div style={{fontSize:12,fontWeight:600,color:L.t1}}>C4 IA Jurídica</div>
-              <div style={{fontSize:9,color:L.t4,fontFamily:"'JetBrains Mono',monospace"}}>{HAS_KEY ? "Claude AI (Anthropic) · Ativo" : "Modo demonstração · Configure a API Key"}</div>
+              <div style={{fontSize:9,color:L.t4,fontFamily:"'JetBrains Mono',monospace"}}>{HAS_KEY ? "Groq AI · LLaMA 3.3 70B · Ativo" : "Modo demonstração · Configure VITE_GROQ_API_KEY"}</div>
             </div>
             <div style={{fontSize:10,color:L.t4}}>{msgs.length - 1} mensagens</div>
           </div>
@@ -341,13 +342,13 @@ export default function PageIA({ user }) {
               : "linear-gradient(135deg,#1a1408,#251d0a)",
             border:`1px solid ${HAS_KEY ? "#1a2d50" : "rgba(201,164,48,0.25)"}`,
           }}>
-            <div style={{fontSize:12,fontWeight:700,color:HAS_KEY?"#5590ff":"#c9a430",marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
-              {HAS_KEY ? "✅ IA Conectada" : "⚙️ Configurar IA"}
+            <div style={{fontSize:12,fontWeight:700,color:HAS_KEY?"#3ab865":"#c9a430",marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
+              {HAS_KEY ? "✅ Groq AI Conectada" : "⚙️ Configurar IA"}
             </div>
             <div style={{fontSize:11,color:"rgba(255,255,255,0.65)",lineHeight:1.65}}>
               {HAS_KEY
-                ? "Claude AI (Anthropic) ativo. Consultas jurídicas reais com legislação e jurisprudência atualizada."
-                : <>Adicione no arquivo <code style={{background:"rgba(201,164,48,0.15)",padding:"1px 5px",borderRadius:4,fontSize:10,fontFamily:"'JetBrains Mono',monospace"}}>.env</code>:<br/><br/><code style={{background:"rgba(201,164,48,0.1)",padding:"4px 8px",borderRadius:5,fontSize:9.5,fontFamily:"'JetBrains Mono',monospace",display:"block",marginTop:2,lineHeight:1.8,color:"#c9a430"}}>VITE_ANTHROPIC_API_KEY=<br/>sk-ant-...</code></>
+                ? <>Groq AI ativo · <b style={{color:"#c9a430"}}>LLaMA 3.3 70B</b><br/>Consultas jurídicas reais com legislação e jurisprudência atualizada.</>
+                : <>Adicione no arquivo <code style={{background:"rgba(201,164,48,0.15)",padding:"1px 5px",borderRadius:4,fontSize:10,fontFamily:"'JetBrains Mono',monospace"}}>.env</code>:<br/><br/><code style={{background:"rgba(201,164,48,0.1)",padding:"4px 8px",borderRadius:5,fontSize:9.5,fontFamily:"'JetBrains Mono',monospace",display:"block",marginTop:2,lineHeight:1.8,color:"#c9a430"}}>VITE_GROQ_API_KEY=<br/>gsk_...</code></>
               }
             </div>
           </div>

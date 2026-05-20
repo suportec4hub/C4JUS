@@ -1,3 +1,6 @@
+// C4 IA Jurídica — Powered by Groq AI
+// Modelo: llama-3.3-70b-versatile (mais capaz da Groq)
+
 const SYSTEM_PROMPT = `Você é o C4 IA Jurídica, assistente de inteligência artificial especializado em Direito brasileiro, integrado ao CRM C4JUS desenvolvido pela C4HUB.
 
 Você é um parceiro jurídico confiável para advogados, promotores, juízes e profissionais do Direito. Responda sempre de forma técnica, precisa e fundamentada.
@@ -35,7 +38,6 @@ Você é um parceiro jurídico confiável para advogados, promotores, juízes e 
 - SEMPRE inclua aviso: "⚠️ Esta minuta foi gerada por IA e deve ser revisada pelo advogado responsável antes do uso."
 
 ## Regras de comportamento:
-
 1. **Cite sempre as fontes**: artigos de lei, súmulas, julgados
 2. **Seja preciso**: prazos, percentuais, procedimentos têm valores exatos
 3. **Admita incertezas**: se não souber, diga claramente
@@ -43,29 +45,30 @@ Você é um parceiro jurídico confiável para advogados, promotores, juízes e 
 5. **Atualizações**: alerte quando uma norma pode ter sido alterada após seu conhecimento
 6. **Ética**: não auxilie práticas ilegais, antiéticas ou contrárias ao Código de Ética da OAB
 
-Responda preferencialmente em português brasileiro, com clareza e objetividade.`;
+Responda em português brasileiro, com clareza e objetividade.`;
 
-export async function askClaude(messages, signal) {
-  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
+export async function askAI(messages, signal) {
+  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
 
   if (!apiKey) {
     throw new Error("API_KEY_MISSING");
   }
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-client-side-keys": "true",
+      "Authorization": `Bearer ${apiKey}`,
     },
     signal,
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
+      model: "llama-3.3-70b-versatile",
       max_tokens: 2048,
-      system: SYSTEM_PROMPT,
-      messages,
+      temperature: 0.65,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...messages,
+      ],
     }),
   });
 
@@ -76,29 +79,29 @@ export async function askClaude(messages, signal) {
   }
 
   const data = await response.json();
-  return data.content[0]?.text || "";
+  return data.choices?.[0]?.message?.content || "";
 }
 
-/* Respostas demo quando não há API key */
-export const DEMO_RESPONSES = {
-  default: `**Modo Demo** — Configure \`VITE_ANTHROPIC_API_KEY\` no arquivo \`.env\` para ativar a IA real.
+/* Respostas demo quando não há API key configurada */
+const DEMO = {
+  default: `**Modo Demo** — Configure \`VITE_GROQ_API_KEY\` no arquivo \`.env\` para ativar a IA real.
 
 No modo produção, responderei consultas sobre:
 • Prazos processuais (CPC, CLT, CTN, CPP)
 • Legislação federal e jurisprudência atualizada
 • STF, STJ, TST — súmulas e julgados
 • Estratégia processual e análise de risco
-• Geração de minutas e peças processuais
-• Interpretação de documentos e contratos
+• Geração de minutas de peças processuais
+• Interpretação de contratos e documentos
 
-*C4 IA Jurídica — Powered by Claude AI (Anthropic)*`,
+*C4 IA Jurídica — Powered by Groq AI (LLaMA 3.3 70B)*`,
 
-  contestacao: `**Prazo para Contestação — Rito Comum**
+  contestacao: `**Prazo para Contestação — Rito Comum (CPC/2015)**
 
 Com base no **art. 335 do CPC/2015**, o prazo para contestação é:
 
 • **15 dias úteis** — regra geral para partes privadas
-• **30 dias úteis** — Fazenda Pública, MP e Defensoria (art. 183 e 186)
+• **30 dias úteis** — Fazenda Pública, MP e Defensoria (arts. 183 e 186)
 • **30 dias úteis** — litisconsortes com diferentes procuradores de escritórios distintos (art. 229)
 
 **Início da contagem:**
@@ -114,7 +117,7 @@ O prazo corre da data da juntada do mandado de citação cumprido (pessoal), da 
 O juiz fixará entre **10% e 20%** sobre:
 - Valor da condenação
 - Proveito econômico obtido
-- Valor atualizado da causa (se não houver condenação em dinheiro)
+- Valor atualizado da causa (se não houver condenação)
 
 **Critérios (§2°, I a IV):**
 1. Grau de zelo do advogado
@@ -123,11 +126,11 @@ O juiz fixará entre **10% e 20%** sobre:
 4. Trabalho realizado e tempo exigido
 
 **Fazenda Pública (§3°):**
-Escalonamento progressivo: 10% até R$200k → 8% de R$200k a R$2M → 5% de R$2M a R$20M → 3% de R$20M a R$100M → 1% acima de R$100M
+Escalonamento: 10% até R$200k → 8% de R$200k a R$2M → 5% de R$2M a R$20M → 3% de R$20M a R$100M → 1% acima de R$100M
 
 **Pontos importantes:**
 • Honorários são direito autônomo do advogado — não podem ser compensados (§14)
-• Honorários recursais: cabimento automático (§11) — STJ tese 1177
+• Honorários recursais: cabimento automático (§11) — STJ Tese 1177
 • Interesse da Fazenda não implica honorários irrisórios
 
 *Ref.: CPC/2015, art. 85; Súmulas 306 e 453/STJ*`,
@@ -135,7 +138,7 @@ Escalonamento progressivo: 10% até R$200k → 8% de R$200k a R$2M → 5% de R$2
 
 export function getDemoResponse(msg) {
   const m = msg.toLowerCase();
-  if (m.includes("contest") || m.includes("prazo") || m.includes("citar") || m.includes("citaç")) return DEMO_RESPONSES.contestacao;
-  if (m.includes("sucumb") || m.includes("honorár") || m.includes("honorarios")) return DEMO_RESPONSES.honorarios;
-  return DEMO_RESPONSES.default;
+  if (m.includes("contest") || m.includes("prazo") || m.includes("citar") || m.includes("citaç")) return DEMO.contestacao;
+  if (m.includes("sucumb") || m.includes("honorár") || m.includes("honorarios")) return DEMO.honorarios;
+  return DEMO.default;
 }
