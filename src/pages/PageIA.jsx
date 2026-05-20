@@ -334,25 +334,6 @@ export default function PageIA({ user }) {
             </div>
           </Card>
 
-          {/* Status da IA */}
-          <div style={{
-            padding:"14px 16px",borderRadius:12,
-            background: HAS_KEY
-              ? "linear-gradient(135deg,#071428,#0c1e40)"
-              : "linear-gradient(135deg,#1a1408,#251d0a)",
-            border:`1px solid ${HAS_KEY ? "#1a2d50" : "rgba(201,164,48,0.25)"}`,
-          }}>
-            <div style={{fontSize:12,fontWeight:700,color:HAS_KEY?"#3ab865":"#c9a430",marginBottom:6,display:"flex",alignItems:"center",gap:6}}>
-              {HAS_KEY ? "✅ Groq AI Conectada" : "⚙️ Configurar IA"}
-            </div>
-            <div style={{fontSize:11,color:"rgba(255,255,255,0.65)",lineHeight:1.65}}>
-              {HAS_KEY
-                ? <>Groq AI ativo · <b style={{color:"#c9a430"}}>LLaMA 3.3 70B</b><br/>Consultas jurídicas reais com legislação e jurisprudência atualizada.</>
-                : <>Adicione no arquivo <code style={{background:"rgba(201,164,48,0.15)",padding:"1px 5px",borderRadius:4,fontSize:10,fontFamily:"'JetBrains Mono',monospace"}}>.env</code>:<br/><br/><code style={{background:"rgba(201,164,48,0.1)",padding:"4px 8px",borderRadius:5,fontSize:9.5,fontFamily:"'JetBrains Mono',monospace",display:"block",marginTop:2,lineHeight:1.8,color:"#c9a430"}}>VITE_GROQ_API_KEY=<br/>gsk_...</code></>
-              }
-            </div>
-          </div>
-
           {/* Aviso ético */}
           <div style={{padding:"12px 14px",borderRadius:10,background:L.surface,border:`1px solid ${L.line}`,fontSize:10.5,color:L.t3,lineHeight:1.65}}>
             <div style={{fontWeight:700,color:L.t2,marginBottom:4,fontSize:11}}>📋 Aviso Legal</div>
